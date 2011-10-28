@@ -1,4 +1,4 @@
-rinvwish <- function (v, S) 
+rinvwish.old <- function (v, S) 
 {
 	S <- solve (S)
 	if (!is.matrix(S)) 
@@ -22,20 +22,23 @@ rinvwish <- function (v, S)
 	return(solve(ret))
 }
 
-rinvwish.alex <- function (delta, D) 
+rinvwish <- function (delta, D) 
 {
   ##Bartlet Decomposition
   T <- chol(solve(D))
   p <- dim(D)[1]
   Psi <- matrix(0, p, p)
   for (i in 1:p) Psi[i, i] <- sqrt(rchisq(1, delta + p - i))
-  if (p > 1) {
-    for (i in 1:(p - 1)) {
-      for (j in (i + 1):p) {
-        Psi[i, j] <- rnorm(1)
-      }
+  if (p > 1)
+    {
+      for (i in 1:(p - 1))
+        {
+          for (j in (i + 1):p)
+            {
+              Psi[i, j] <- rnorm(1)
+            }
+        }
     }
-  }
   Psi <- Psi %*% T
   return(solve(t(Psi) %*% Psi))
 }
@@ -47,6 +50,15 @@ rmvnorm <- function(mu, Sigma)
   x <- z %*% chol(Sigma)
   return(x + mu)
 }
+
+rmvnorm.precision <- function(mu,K)
+  {
+    p <- dim(K)[2]
+    Q <- chol(K)
+    z <- rnorm(p)
+    x <- backsolve(Q,z) + mu
+    return(x)
+  }
 
 mydet <- function(A)
   {

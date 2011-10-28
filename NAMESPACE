@@ -1,2 +1,4 @@
 export(ivbma)
+export(ivbma.sample.theta)
+export(ivbma.cv.study)
 export(summary.ivbma)

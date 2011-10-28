@@ -24,8 +24,8 @@ get.YX.star <- function(Y,X,W,rho,Sigma,eta,r,j)
         both <- c(1, j + 1)
         beta <- rho[1:r]
         Psi <- Sigma[both,-both] %*% solve(Sigma[-both,-both])
-        Y.star <- (Y- W %*% gamma - X[,-j] %*% beta[-j] - eta[,-j] %*% Psi[1,]) / beta[j]
-        X.star <- X[,j] - eta[,-j] %*% Psi[2,]
+        Y.star <- (Y- W %*% gamma - X[,-j,drop=FALSE] %*% beta[-j] - eta[,-j,drop=FALSE] %*% Psi[1,]) / beta[j]
+        X.star <- X[,j] - eta[,-j,drop=FALSE] %*% Psi[2,]
       }
     return(cbind(Y.star,X.star))
   }
@@ -96,10 +96,15 @@ update.L <- function(Y.tilde,xi, L, V)
   if(log(runif(1)) < alpha)
     {
       L <- L.new
+      rho.hat.1 <- rho.hat.2
+      Xi.1 <- Xi.2
     }
   ##-----------------------------
-  
-  return(L)
+
+  rho <- rep(0,p.V)
+  rho[(1:p.V)[L==1]] <- rmvnorm.precision(rho.hat.1, Xi.1)
+
+  return(list(L = L, rho = rho))
 
 }
 
@@ -110,7 +115,7 @@ update.rho <- function(Y.tilde,xi,L,V)
     V.L <- V[, (1:p.V)[L==1],drop=FALSE]
     Xi.L <- diag(sum(L)) + (t(V.L)%*%V.L) / xi
     rho.hat.L <- xi^(-1) %*% t(Y.tilde) %*% V.L %*% solve(Xi.L)
-    rho[(1:p.V)[L==1]] <- rmvnorm(rho.hat.L, solve(Xi.L))
+    rho[(1:p.V)[L==1]] <- rmvnorm.precision(rho.hat.L, Xi.L)
     return(rho)
   }
 
@@ -159,10 +164,15 @@ update.M <- function(YX.star, U, M, Omega)
     if(log(runif(1)) < alpha)
       {
         M <- M.new
+        Omega.1 <- Omega.2
+        lambda.1 <- lambda.2
       }
     ##---------------------------
-    
-    return(M)
+
+    lambda <- rep(0,p.U)
+    lambda[ (1:p.U)[M==1]] <- rmvnorm.precision(lambda.1,Omega.1)
+
+    return(list(M = M, lambda = lambda))
   }
 
 update.lambda <- function(YX.star,U,M,Omega)
@@ -188,7 +198,8 @@ update.lambda <- function(YX.star,U,M,Omega)
     ##---------------------------
 
     lambda <- rep(0,p.U)
-    lambda[ (1:p.U)[M==1]] <- rmvnorm(lambda.M,solve(Omega.M))
+    lambda[ (1:p.U)[M==1]] <- rmvnorm.precision(lambda.M,Omega.M)
+
     return(lambda)
   }
 
@@ -227,10 +238,15 @@ update.M.SUR <-function(X.star, U, omega, M)
     if(log(runif(1)) < alpha)
       {
         M <- M.new
+        Omega.1 <- Omega.2
+        lambda.1 <- lambda.2
       }
     ##---------------------------
-    
-    return(M)
+
+    lambda <- rep(0,p.U)
+    lambda[ (1:p.U)[M==1]] <- rmvnorm.precision(lambda.1,Omega.1)
+
+    return(list(M = M, lambda = lambda))
     
   }
 
@@ -242,7 +258,7 @@ update.lambda.SUR <- function(X.star, U, omega, M)
   Omega.M <- diag(p.M) + (t(U.M) %*% U.M) / omega
   lambda.M <- omega^(-1) * t(X.star) %*% U.M %*% solve(Omega.M)
   lambda <- rep(0, p.U)
-  lambda[(1:p.U)[M == 1]] <- rmvnorm(lambda.M, solve(Omega.M))
+  lambda[(1:p.U)[M == 1]] <- rmvnorm.precision(lambda.M, Omega.M)
   return(lambda)
 }
 
@@ -252,17 +268,24 @@ update.Sigma <- function(eps,eta,r)
     UU <- t(E) %*% E
     n <- dim(E)[1]
     
-    Sigma <- rinvwish(2 + r + n,diag(r +1) + UU)
+    Sigma <- rinvwish(3 + n,diag(r +1) + UU)
 
   }
-update.theta <- function(theta,D,full)
+
+ivbma.sample.theta <- function(theta,D,full)
   {
 
     ##---- Update Outcome Parameters ---------
     Y.tilde <- get.Y.tilde(D$Y,theta$Sigma,theta$eta)
     xi <- get.xi(theta$Sigma)
-    if(!full)theta$L <- update.L(Y.tilde,xi,theta$L,D$V)
-    theta$rho <- update.rho(Y.tilde,xi,theta$L,D$V)
+    if(!full)
+      {
+        l <- update.L(Y.tilde,xi,theta$L,D$V)
+        theta$L <- l$L
+        theta$rho <- l$rho
+      }else{
+        theta$rho <- update.rho(Y.tilde,xi,theta$L,D$V)
+      }
     theta$eps <- D$Y - D$V %*% theta$rho
     ##----------------------------------------
 
@@ -279,13 +302,25 @@ update.theta <- function(theta,D,full)
               }else{
                 Omega <- get.Omega(theta$Sigma,theta$rho[i])
               }
-            if(!full)theta$M[,i] <- update.M(YX.star,D$U,theta$M[,i],Omega)
-            theta$lambda[,i] <- update.lambda(YX.star, D$U, theta$M[,i],Omega)
+            if(!full)
+              {
+                l <- update.M(YX.star,D$U,theta$M[,i],Omega)
+                theta$M[,i] <- l$M
+                theta$lambda[,i] <- l$lambda
+              }else{
+                theta$lambda[,i] <- update.lambda(YX.star, D$U, theta$M[,i],Omega)
+              }
           }else{
             X.star <- get.X.star(theta$Sigma,D$X,theta$eps,theta$eta,D$r,i)
             omega <- get.omega(theta$Sigma,i)
-            if(!full)theta$M[,i] <- update.M.SUR(X.star,D$U,omega, theta$M[,i])
-            theta$lambda[,i] <- update.lambda.SUR(X.star,D$U, omega, theta$M[,i])
+            if(!full)
+              {
+                l <- update.M.SUR(X.star,D$U,omega, theta$M[,i])
+                theta$M[,i] <- l$M
+                theta$lambda[,i] <- l$lambda
+              }else{
+                theta$lambda[,i] <- update.lambda.SUR(X.star,D$U, omega, theta$M[,i])
+              }
           }
         theta$eta[,i] <- D$X[,i] - D$U %*% theta$lambda[,i]
       }
@@ -339,7 +374,7 @@ ivbma.init <- function(D,full)
     q <- dim(D$Z)[2]
     p <- dim(D$W)[2]
     r <- dim(D$X)[2]
-    d <- r + 2  ##Prior degrees of freedom
+    d <- 3  ##Prior degrees of freedom
     R <- diag(r + 1) ##Prior covariance
 
     ##---------- Initialization --------------------
@@ -352,7 +387,7 @@ ivbma.init <- function(D,full)
     L <- NULL
     for(i in 1:r)
       {
-        lambda[,i] <- solve(t(D$U) %*% D$U) %*% t(D$U) %*% D$X[,i]
+        lambda[,i] <- solve(t(D$U) %*% D$U + diag(p.U)) %*% t(D$U) %*% D$X[,i]
         if(full)
           {
             M[,i] <- 1
@@ -362,7 +397,7 @@ ivbma.init <- function(D,full)
         lambda[ (1:p.U)[M[,i] == 0] ,i] <- 0
         eta[,i] <- D$X[,i] - D$U %*% lambda[,i]
       }
-    eps <- D$Y - D$V %*% (solve(t(D$V) %*% D$V) %*% t(D$V) %*% D$Y)
+    eps <- D$Y - D$V %*% (solve(t( D$V) %*% D$V + diag(p.V)) %*% t(D$V) %*% D$Y)
     Sigma <- rinvwish(d + n,R + (n-1) * cov(cbind(eps, eta)))
     if(full)
       {
@@ -426,9 +461,9 @@ ivbma <- function(Y,X,Z,W,s=1e3,b = round(s/10),
     ##----------- Fill Data ---------
     D <- NULL
     D$Y <- Y
-    D$U <- cbind(Z,W)
+    D$U <- cbind(as.matrix(Z),as.matrix(W))
     D$Z <- as.matrix(Z)
-    D$V <- cbind(X,W)
+    D$V <- cbind(as.matrix(X),as.matrix(W))
     D$W <- as.matrix(W)
     D$X <- as.matrix(X)
     D$r <- dim(D$X)[2]
@@ -439,17 +474,18 @@ ivbma <- function(Y,X,Z,W,s=1e3,b = round(s/10),
     results <- ivbma.results.init(D,odens, run.diagnostics)
     which.save <- round(seq(b + 1, s, length = odens))
     save.loc <- 1
+    next.save <- which.save[save.loc]
     ##--------------------------------
     print(paste("Running IVBMA for",s,"iterations",Sys.time()))
     for(i in 1:s)
       {
         if(i %% print.every == 0)print(paste("On Iteration", i,Sys.time()))
 
-        theta <- update.theta(theta,D,full)
+        theta <- ivbma.sample.theta(theta,D,full)
 
         
         ##---------- Record ----------------------------
-        if(is.element(i, which.save))
+        if(i == next.save)
           {
             ##--------------- Save -----------------------------------
             results$rho[save.loc,] <- theta$rho
@@ -458,6 +494,7 @@ ivbma <- function(Y,X,Z,W,s=1e3,b = round(s/10),
             results$L[save.loc,] <- theta$L
             results$M[,,save.loc] <- theta$M
             save.loc <- save.loc + 1
+            next.save <- which.save[save.loc]
             ##--------------------------------------------------------
             if(run.diagnostics)
               {
@@ -466,11 +503,14 @@ ivbma <- function(Y,X,Z,W,s=1e3,b = round(s/10),
                 results$Bayesian.Sargan <- results$Bayesian.Sargan + dd[2] / odens
               }
           }
-        results$rho.bar <- results$rho.bar + theta$rho/s
-        results$lambda.bar <- results$lambda.bar + theta$lambda / s
-        results$L.bar <- results$L.bar + theta$L / s
-        results$M.bar <- results$M.bar + theta$M / s
-        results$Sigma.bar <- results$Sigma.bar + theta$Sigma / s
+        if(i > b)
+          {
+            results$rho.bar <- results$rho.bar + theta$rho/ (s - b)
+            results$lambda.bar <- results$lambda.bar + theta$lambda / (s - b)
+            results$L.bar <- results$L.bar + theta$L / (s - b)
+            results$M.bar <- results$M.bar + theta$M / (s - b)
+            results$Sigma.bar <- results$Sigma.bar + theta$Sigma / (s - b)
+          }
         ##------------------------------------------------------
       }
     class(results) <- c("ivbma",class(results))

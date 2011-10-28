@@ -69,27 +69,26 @@ using conditional Bayes factors.
   }
 \examples{
 set.seed(1)
-## Runs one example of the simulation study in Karl and Lenkoski (2012)
-n <- 120
-q <- 10
-p <- 15
-Sigma.true <- matrix(c(1,0.4,0.4,1),ncol=2)
-epseta.true <- matrix(rnorm(n * 2),n,2) \%*\% chol(Sigma.true)
-eps.true <- epseta.true[,1]
-eta.true <- epseta.true[,2]
-beta.true  <- 1.5
-gamma.true <- c(2,0,0,1.4,0,0,0,2.7,1.25,0,0,0,3.3,0,0)
-delta.true <- c(0,0,4.1,0,0,0,1.2,3,0,0.9)
-tau.true <- c(0,2.5,0,0,0,0,0,0,1.7,0,0,0,0.8,0,0)
-Z <- matrix(rnorm(n * q),ncol=q)
-W <- matrix(rnorm(n * p),ncol=p)
-X <- Z \%*\% delta.true + W \%*\% tau.true + eta.true
-Y <- X \%*\% beta.true + W \%*\% gamma.true + eps.true
-a <- ivbma(Y,X,W,Z)
-summary(a)
+data(growth)
+attach(growth)
+## To replicate KL, set s to 1e5
+a <- ivbma(Y, X, Z, W, s = 1e2)
+summary(a, nms.U = c(names(Z), names(W)),nms.V = c(names(X), names(W)))
+detach(growth)
+
+set.seed(1)
+data(margarine)
+attach(margarine)
+## To replicate KL, set s to 2.5e5
+a <- ivbma(Y, X, Z, W, s=1e2)
+summary(a, nms.U = c(names(Z), names(W)),nms.V = c(names(X), names(W)))
+detach(margarine)
+
 }
+
 \seealso{
-\code{\link{summary.ivbma}}
+  \code{\link{summary.ivbma}}
+  \code{\link{ivbma.cv.study}}
 }
 \references{Anna Karl and Alex Lenkoski (2012). "Instrumental Variable Bayesian
 Model Averaging via Conditional Bayes Factors" http://arxiv.org/abs/1202.5846}
