@@ -72,7 +72,16 @@ update.L <- function(Y.tilde,xi, L, V)
   w <- sample(1:p.V,1)
   L.new <- L
   L.new[w] <- 1 - L.new[w]
-  if(sum(L.new) == 0) return(L)
+  if(sum(L.new) == 0)
+    {
+      p.1 <- sum(L)
+      V.1 <- V[, (1:p.V)[L==1],drop=FALSE]
+      Xi.1 <- diag(p.1) + (t(V.1)%*%V.1) / xi
+      rho.hat.1 <- xi^(-1) %*% t(Y.tilde) %*% V.1 %*% solve(Xi.1)
+      rho <- rep(0,p.V)
+      rho[(1:p.V)[L==1]] <- rmvnorm.precision(rho.hat.1, Xi.1)
+      return(list(L = L, rho = rho))
+    }
   ##-----------------------------
 
   ##---- Stats for old model ----
@@ -130,7 +139,21 @@ update.M <- function(YX.star, U, M, Omega)
     w <- sample(1:p.U,1)
     M.new <- M
     M.new[w] <- 1 - M.new[w]
-    if(sum(M.new) == 0) return(M)
+    if(sum(M.new) == 0)
+      {
+        p.1 <- sum(M)
+        Phi.inv <- solve(chol(Omega))
+        S.row <- YX.star %*% Phi.inv
+        S <- as.vector(S.row)
+        U.1 <- U[,(1:p.U)[M == 1],drop=FALSE]
+        U.1.row <- cbind(as.vector(U.1),as.vector(U.1)) %*% Phi.inv
+        T.1 <- rbind(matrix(U.1.row[,1],n,p.1),matrix(U.1.row[,2],n,p.1))
+        Omega.1 <- diag(p.1) + t(T.1) %*% T.1
+        lambda.1 <- t(S) %*% T.1 %*% solve(Omega.1)
+        lambda <- rep(0,p.U)
+        lambda[ (1:p.U)[M==1]] <- rmvnorm.precision(lambda.1,Omega.1)
+        return(list(M = M, lambda = lambda))
+      }
     ##-----------------------------
     
     ##------ Dependent Var ---
