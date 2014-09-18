@@ -239,7 +239,16 @@ update.M.SUR <-function(X.star, U, omega, M)
     M.new <- M
     M.new[w] <- 1 - M.new[w]
     p.2 <- sum(M.new)
-    if(p.2 == 0) return(M)
+    if(p.2 == 0)
+      {
+        U.1 <- U[,(1:p.U)[M == 1],drop=FALSE]
+        Omega.1 <- diag(p.1) + (t(U.1) %*% U.1) / omega
+        lambda.1 <- omega^(-1) * t(X.star) %*% U.1 %*% solve(Omega.1)
+        lambda <- rep(0,p.U)
+        lambda[ (1:p.U)[M==1]] <- rmvnorm.precision(lambda.1,Omega.1)
+        
+        return(list(M = M, lambda = lambda))
+      }
     ##------------------------
 
     ##----- Score Old --------
@@ -523,7 +532,8 @@ ivbma <- function(Y,X,Z,W,s=1e3,b = round(s/10),
               {
                 dd <- ivbma.diagnostics(theta,D)
                 results$Sargan <- results$Sargan + dd[1] / odens
-                results$Bayesian.Sargan <- results$Bayesian.Sargan + dd[2] / odens
+##                results$Bayesian.Sargan[i] <- results$Bayesian.Sargan + dd[2] / odens
+                results$Bayesian.Sargan[i] <- dd[2]
               }
           }
         if(i > b)

@@ -1,7 +1,6 @@
-1959a2294ce8acc72e5cccb88ae5fbb9 *DESCRIPTION
+ec266ffdb3b07e3d303dc4b1f5a628cb *DESCRIPTION
 7424afaabadd450d126d8842540e3366 *NAMESPACE
-a12386e8416d92b6584e521549291478 *R/dynamic.probit.R
-f13900feb3fd7a0aa5b69ea6c2604552 *R/ivbma.R
+45465a3654d10d06668d9c97bca1deaf *R/ivbma.R
 1ee41d35f6d0d96eff767e9cf84c7133 *R/ivbma.cv.study.R
 d1726ac87c8226eaf0412f7eafb9f81b *R/ivbma.utils.R
 354639d1cba07659cdc4aa779841871c *R/summary.ivbma.R
